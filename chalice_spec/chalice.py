@@ -198,3 +198,6 @@ class ChaliceWithSpec(Chalice, APIRuntimeHandler):
             return super(ChaliceWithSpec, self).route(path, **kwargs)(func)
 
         return route_decorator
+
+    def __call__(self, event, context):
+        return APIRuntimeHandler.__call__(self, event, context)

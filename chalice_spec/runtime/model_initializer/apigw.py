@@ -5,7 +5,7 @@ def initialize_apigw() -> APIGatewayProxyEventModel:
     """
     Create empty api gateway event.
     """
-    return APIGatewayProxyEventModel.from_orm(
+    return APIGatewayProxyEventModel.parse_obj(
         {
             "resource": "/my/path",
             "path": "/my/path",
@@ -19,7 +19,7 @@ def initialize_apigw() -> APIGatewayProxyEventModel:
                 "apiId": "",
                 "authorizer": {},
                 "httpMethod": "GET",
-                "identity": {},
+                "identity": {"sourceIp": "0.0.0.0"},
                 "path": "/my/path",
                 "protocol": "HTTP/1.1",
                 "requestId": "id=",

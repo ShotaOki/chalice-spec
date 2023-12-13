@@ -5,4 +5,4 @@ def initialize_bedrock_agent() -> BedrockAgentEventModel:
     """
     Create empty bedrock agent event.
     """
-    return BedrockAgentEventModel.from_orm({})
+    return BedrockAgentEventModel.parse_obj({})

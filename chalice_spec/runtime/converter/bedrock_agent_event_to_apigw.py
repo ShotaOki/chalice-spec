@@ -14,7 +14,7 @@ class BedrockAgentEventToApiGateway(EventConverter):
         :param event: dict api gateway event
         :return: other type event
         """
-        agent_event = BedrockAgentEventModel.from_orm(event)
+        agent_event = BedrockAgentEventModel.parse_obj(event)
         apigw_event = initialize_apigw()
         apigw_event.requestContext.httpMethod = agent_event.http_method
         apigw_event.requestContext.resourcePath = agent_event.api_path
@@ -23,7 +23,9 @@ class BedrockAgentEventToApiGateway(EventConverter):
             apigw_event.body = json.dumps(
                 {
                     prop.name: prop.value
-                    for prop in agent_event.parameters["application/json"]
+                    for prop in agent_event.request_body.content[
+                        "application/json"
+                    ].properties
                 }
             )
         else:
@@ -38,14 +40,14 @@ class BedrockAgentEventToApiGateway(EventConverter):
         :param response: dict api gateway response
         :return: other type response
         """
-        agent_event = BedrockAgentEventModel.from_orm(event)
+        agent_event = BedrockAgentEventModel.parse_obj(event)
         return {
             "messageVersion": "1.0",
             "response": {
                 "actionGroup": agent_event.action_group,
                 "apiPath": agent_event.api_path,
                 "httpMethod": agent_event.http_method,
-                "httpStatusCode": response["status_code"],
+                "httpStatusCode": response["statusCode"],
                 "responseBody": {
                     "application/json": {
                         "body": response["body"],

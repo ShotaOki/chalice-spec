@@ -1,4 +1,4 @@
-from chalice_spec.chalice import ChaliceWithSpec
+from chalice.app import Chalice
 from chalice_spec.runtime.converter.bedrock_agent_event_to_apigw import (
     BedrockAgentEventToApiGateway,
 )
@@ -35,7 +35,7 @@ class APIRuntimeHandler:
         """
         if self._runtime == APIRuntime.APIGateway:
             # Called by API Gateway Integration
-            return ChaliceWithSpec.__call__(self, event, context)
+            return Chalice.__call__(self, event, context)
         elif self._runtime == APIRuntime.BedrockAgent:
             # Called by Bedrock Agent
             converter = BedrockAgentEventToApiGateway()
@@ -43,7 +43,7 @@ class APIRuntimeHandler:
             # Other Integration
             raise Exception("Unknown integration")
         # Invoke parent __call__ method
-        api_gateway_response = ChaliceWithSpec.__call__(
+        api_gateway_response = Chalice.__call__(
             self, event=converter.convert_request(event), context=context
         )
         # Return lambda result
