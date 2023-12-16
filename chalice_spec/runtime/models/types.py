@@ -28,4 +28,13 @@ AnyCallableT = TypeVar("AnyCallableT", bound=Callable[..., Any])  # noqa: VNE001
 # JSON primitives only, mypy doesn't support recursive tho
 JSONType = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
 
-__all__ = ["get_args", "get_origin", "Annotated", "Protocol", "TypedDict", "Literal", "NotRequired", "TypeAlias"]
+__all__ = [
+    "get_args",
+    "get_origin",
+    "Annotated",
+    "Protocol",
+    "TypedDict",
+    "Literal",
+    "NotRequired",
+    "TypeAlias",
+]

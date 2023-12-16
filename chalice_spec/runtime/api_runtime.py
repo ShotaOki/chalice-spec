@@ -3,7 +3,6 @@ from chalice_spec.runtime.converter.bedrock_agent_event_to_apigw import (
     BedrockAgentEventToApiGateway,
 )
 from enum import Enum
-from typing import List
 
 from chalice_spec.runtime.model_utility.apigw import is_api_gateway_event
 from chalice_spec.runtime.model_utility.bedrock_agent import is_bedrock_agent_event
@@ -23,9 +22,9 @@ class APIRuntimeHandler:
     Mixin : add __call__ method
     """
 
-    _runtime: List[APIRuntime] = [APIRuntime.APIGateway]
+    _runtime: list[APIRuntime] = [APIRuntime.APIGateway]
 
-    def set_runtime_handler(self, runtime: APIRuntime | List[APIRuntime]):
+    def set_runtime_handler(self, runtime: APIRuntime | list[APIRuntime]):
         """
         Set Runtime Handler
         Default is invoke by API Gateway
