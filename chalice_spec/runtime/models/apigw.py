@@ -2,9 +2,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, root_validator, Field
-from pydantic.networks import IPvAnyNetwork
-
-from chalice_spec.runtime.models.types import Literal
 
 
 class ApiGatewayUserCertValidity(BaseModel):
@@ -31,7 +28,7 @@ class APIGatewayEventIdentity(BaseModel):
     cognitoIdentityId: Optional[str] = None
     cognitoIdentityPoolId: Optional[str] = None
     principalOrgId: Optional[str] = None
-    sourceIp: Union[IPvAnyNetwork, Literal["test-invoke-source-ip"]]
+    sourceIp: str
     user: Optional[str] = None
     userAgent: Optional[str] = None
     userArn: Optional[str] = None
@@ -58,11 +55,11 @@ class APIGatewayEventRequestContext(BaseModel):
     domainName: Optional[str] = None
     domainPrefix: Optional[str] = None
     extendedRequestId: Optional[str] = None
-    httpMethod: Literal["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    httpMethod: str
     path: str
     connectedAt: Optional[datetime] = None
     connectionId: Optional[str] = None
-    eventType: Optional[Literal["CONNECT", "MESSAGE", "DISCONNECT"]] = None
+    eventType: Optional[str] = None
     messageDirection: Optional[str] = None
     messageId: Optional[str] = None
     routeKey: Optional[str] = None
@@ -82,9 +79,7 @@ class APIGatewayProxyEventModel(BaseModel):
     version: Optional[str] = None
     resource: Optional[str] = None
     path: Optional[str] = None
-    httpMethod: Literal[
-        "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"
-    ] = Field("GET")
+    httpMethod: str = Field("")
     headers: Dict[str, str]
     multiValueHeaders: Dict[str, List[str]] = Field({})
     queryStringParameters: Optional[Dict[str, str]] = None

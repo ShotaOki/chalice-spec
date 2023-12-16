@@ -1,4 +1,6 @@
-from chalice_spec import APISpec, PydanticPlugin, ChaliceWithSpec, Docs, Operation
+from chalice_spec import ChaliceWithSpec, PydanticPlugin
+from apispec import APISpec
+from chalice_spec.docs import Docs, Operation
 from chalice import BadRequestError
 from chalicelib.data_type import (
     TalkResponse,

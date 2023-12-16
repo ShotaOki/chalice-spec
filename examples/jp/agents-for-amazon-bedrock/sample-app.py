@@ -1,4 +1,7 @@
-from chalice_spec import APISpec, PydanticPlugin, ChaliceWithSpec, Docs, Operation
+from chalice_spec import ChaliceWithSpec, PydanticPlugin
+from apispec import APISpec
+from chalice_spec.docs import Docs, Operation
+from chalice_spec.runtime import APIRuntimeBedrockAgent
 from chalice import BadRequestError
 from chalicelib.data_type import (
     TalkResponse,
@@ -17,7 +20,9 @@ spec = APISpec(
     version="0.1.0",
     plugins=[PydanticPlugin()],
 )
-app = ChaliceWithSpec(app_name="app_sample_jp_purchase_api", spec=spec)
+app = ChaliceWithSpec(
+    app_name="app_sample_jp_purchase_api", spec=spec, runtime=APIRuntimeBedrockAgent
+)
 
 
 @app.route(
