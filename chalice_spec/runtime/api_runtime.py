@@ -17,6 +17,12 @@ class APIRuntime(Enum):
     BedrockAgent = "bedrock-agent"
 
 
+# Runtime Constants
+APIRuntimeApiGateway = [APIRuntime.APIGateway]
+APIRuntimeBedrockAgent = [APIRuntime.BedrockAgent]
+APIRuntimeAll = [APIRuntime.APIGateway, APIRuntime.BedrockAgent]
+
+
 class APIRuntimeHandler:
     """
     Mixin : add __call__ method
@@ -24,15 +30,12 @@ class APIRuntimeHandler:
 
     _runtime: list[APIRuntime] = [APIRuntime.APIGateway]
 
-    def set_runtime_handler(self, runtime: APIRuntime | list[APIRuntime]):
+    def set_runtime_handler(self, runtime: list[APIRuntime]):
         """
         Set Runtime Handler
         Default is invoke by API Gateway
         """
-        if isinstance(runtime, list):
-            self._runtime = runtime
-        else:
-            self._runtime = [runtime]
+        self._runtime = runtime
 
     def __call__(self, event: dict, context: dict):
         """

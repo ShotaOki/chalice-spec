@@ -3,7 +3,11 @@ from apispec import APISpec
 from chalice_spec.chalice import ChaliceWithSpec
 from chalice_spec.docs import Docs
 from chalice_spec.pydantic import PydanticPlugin
-from chalice_spec.runtime.api_runtime import APIRuntime
+from chalice_spec.runtime.api_runtime import (
+    APIRuntimeBedrockAgent,
+    APIRuntimeAll,
+    APIRuntimeApiGateway,
+)
 from chalice_spec.runtime.converter import EventConverter
 from chalice_spec.runtime.model_utility.apigw import (
     empty_api_gateway_event,
@@ -109,7 +113,7 @@ def test_invoke_from_agents_for_amazon_bedrock():
     Expects:
         Return response for Amazon Bedrock Agent
     """
-    app, spec = setup_test(APIRuntime.BedrockAgent)
+    app, spec = setup_test(APIRuntimeBedrockAgent)
 
     @app.route(
         "/posts",
@@ -143,7 +147,7 @@ def test_invoke_from_agents_for_amazon_bedrock_no_post_body():
     Expects:
         Return response for Amazon Bedrock Agent
     """
-    app, spec = setup_test(APIRuntime.BedrockAgent)
+    app, spec = setup_test(APIRuntimeBedrockAgent)
 
     @app.route(
         "/posts",
@@ -171,7 +175,7 @@ def test_invoke_from_agents_for_api_gateway():
     Expects:
         Return response for Amazon API Gateway
     """
-    app, spec = setup_test(APIRuntime.APIGateway)
+    app, spec = setup_test(APIRuntimeApiGateway)
 
     @app.route(
         "/posts",
@@ -201,7 +205,7 @@ def test_invoke_from_dual_services():
     Expects:
         Return response for Correct response
     """
-    app, spec = setup_test([APIRuntime.APIGateway, APIRuntime.BedrockAgent])
+    app, spec = setup_test(APIRuntimeAll)
 
     @app.route(
         "/posts",
@@ -237,7 +241,7 @@ def test_invoke_from_deny_service():
     Expects:
         Failed to execute
     """
-    app, spec = setup_test([APIRuntime.APIGateway])
+    app, spec = setup_test([APIRuntimeApiGateway])
 
     @app.route(
         "/posts",
