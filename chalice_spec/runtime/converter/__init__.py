@@ -1,5 +1,5 @@
 class EventConverter:
-    def convert_request(self, event):
+    def convert_request(self, event: dict) -> dict:
         """
         parse event input to other type parameter.
 
@@ -8,7 +8,7 @@ class EventConverter:
         """
         return event
 
-    def convert_response(self, event, response):
+    def convert_response(self, event: dict, response: dict) -> dict:
         """
         parse event response to other type response.
 

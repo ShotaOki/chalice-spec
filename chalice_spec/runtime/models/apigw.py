@@ -31,8 +31,6 @@ class APIGatewayEventIdentity(BaseModel):
     cognitoIdentityId: Optional[str] = None
     cognitoIdentityPoolId: Optional[str] = None
     principalOrgId: Optional[str] = None
-    # see #1562, temp workaround until API Gateway fixes it the Test button payload
-    # removing it will not be considered a regression in the future
     sourceIp: Union[IPvAnyNetwork, Literal["test-invoke-source-ip"]]
     user: Optional[str] = None
     userAgent: Optional[str] = None

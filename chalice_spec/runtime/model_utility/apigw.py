@@ -1,14 +1,26 @@
 from chalice_spec.runtime.models.apigw import APIGatewayProxyEventModel
 
 
-def initialize_apigw() -> APIGatewayProxyEventModel:
+def is_api_gateway_event(event: dict) -> bool:
+    """
+    Check event is api gateway event.
+    """
+    try:
+        APIGatewayProxyEventModel.parse_obj(event)
+        return True
+    except Exception:
+        # throw pydantic -> event is not API Gateway Event
+        return False
+
+
+def empty_api_gateway_event() -> APIGatewayProxyEventModel:
     """
     Create empty api gateway event.
     """
     return APIGatewayProxyEventModel.parse_obj(
         {
-            "resource": "/my/path",
-            "path": "/my/path",
+            "resource": "",
+            "path": "",
             "httpMethod": "GET",
             "headers": {},
             "multiValueHeaders": {},
@@ -20,13 +32,13 @@ def initialize_apigw() -> APIGatewayProxyEventModel:
                 "authorizer": {},
                 "httpMethod": "GET",
                 "identity": {"sourceIp": "0.0.0.0"},
-                "path": "/my/path",
-                "protocol": "HTTP/1.1",
-                "requestId": "id=",
-                "requestTime": "04/Mar/2020:19:15:17 +0000",
-                "requestTimeEpoch": 1583349317135,
-                "resourcePath": "/my/path",
-                "stage": "$default",
+                "path": "",
+                "protocol": "",
+                "requestId": "",
+                "requestTime": "",
+                "requestTimeEpoch": 0,
+                "resourcePath": "",
+                "stage": "",
             },
             "body": "",
             "isBase64Encoded": False,
