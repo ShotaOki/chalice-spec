@@ -43,18 +43,19 @@ class APIRuntimeHandler:
         This method will be called by lambda event handler.
         event is lambda event, context is lambda context.
         """
-        if (APIRuntime.APIGateway in self._runtime) and is_api_gateway_event(event):
-            # Called by API Gateway Integration
-            return Chalice.__call__(self, event, context)
-
         converter = None
         # Called by Bedrock Agent
         if (APIRuntime.BedrockAgent in self._runtime) and is_bedrock_agent_event(event):
             converter = BedrockAgentEventToApiGateway()
-        # Unknown Caller
+
+        # Unknown, or default caller
         if converter is None:
-            # Not found converter
-            raise Exception("Not found converter")
+            if APIRuntime.APIGateway in self._runtime:
+                # Default Runtime
+                return Chalice.__call__(self, event, context)
+            else:
+                # Not found converter
+                raise Exception("Not found converter")
 
         # Invoke parent __call__ method
         api_gateway_response = Chalice.__call__(

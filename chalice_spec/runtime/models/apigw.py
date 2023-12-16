@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Type, Union
 
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, root_validator, Field
 from pydantic.networks import IPvAnyNetwork
 
 from chalice_spec.runtime.models.types import Literal
@@ -44,15 +44,15 @@ class APIGatewayEventAuthorizer(BaseModel):
 
 
 class APIGatewayEventRequestContext(BaseModel):
-    accountId: str
-    apiId: str
+    accountId: Optional[str] = None
+    apiId: Optional[str] = None
     authorizer: Optional[APIGatewayEventAuthorizer] = None
-    stage: str
-    protocol: str
+    stage: Optional[str] = None
+    protocol: Optional[str] = None
     identity: APIGatewayEventIdentity
-    requestId: str
-    requestTime: str
-    requestTimeEpoch: datetime
+    requestId: Optional[str] = None
+    requestTime: Optional[str] = None
+    requestTimeEpoch: datetime = Field(datetime.utcnow())
     resourceId: Optional[str] = None
     resourcePath: str
     domainName: Optional[str] = None
@@ -80,15 +80,17 @@ class APIGatewayEventRequestContext(BaseModel):
 
 class APIGatewayProxyEventModel(BaseModel):
     version: Optional[str] = None
-    resource: str
-    path: str
-    httpMethod: Literal["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    resource: Optional[str] = None
+    path: Optional[str] = None
+    httpMethod: Literal[
+        "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"
+    ] = Field("GET")
     headers: Dict[str, str]
-    multiValueHeaders: Dict[str, List[str]]
+    multiValueHeaders: Dict[str, List[str]] = Field({})
     queryStringParameters: Optional[Dict[str, str]] = None
     multiValueQueryStringParameters: Optional[Dict[str, List[str]]] = None
     requestContext: APIGatewayEventRequestContext
     pathParameters: Optional[Dict[str, str]] = None
     stageVariables: Optional[Dict[str, str]] = None
-    isBase64Encoded: bool
+    isBase64Encoded: bool = Field(False)
     body: Optional[Union[str, Type[BaseModel]]] = None
