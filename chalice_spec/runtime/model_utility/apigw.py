@@ -40,7 +40,7 @@ def empty_api_gateway_event() -> APIGatewayProxyEventModel:
                 "resourcePath": "",
                 "stage": "",
             },
-            "body": "",
+            "body": "{}",
             "isBase64Encoded": False,
         }
     )

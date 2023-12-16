@@ -4,6 +4,16 @@ from chalice_spec.chalice import ChaliceWithSpec
 from chalice_spec.docs import Docs
 from chalice_spec.pydantic import PydanticPlugin
 from chalice_spec.runtime.api_runtime import APIRuntime
+from chalice_spec.runtime.converter import EventConverter
+from chalice_spec.runtime.model_utility.apigw import (
+    empty_api_gateway_event,
+    is_api_gateway_event,
+)
+from chalice_spec.runtime.model_utility.bedrock_agent import (
+    empty_bedrock_agent_event,
+    empty_bedrock_agent_response,
+    is_bedrock_agent_event,
+)
 from tests.schema import TestSchema, AnotherSchema
 from pydantic import BaseModel
 
@@ -22,6 +32,10 @@ def setup_test(runtime):
 class APIParameter(BaseModel):
     apiPath: str
     httpMethod: str
+
+
+class EmptySchema(BaseModel):
+    pass
 
 
 def parameter_agents_for_amazon_bedrock(parameter: APIParameter):
@@ -87,6 +101,14 @@ def parameter_api_gateway(parameter: APIParameter):
 
 
 def test_invoke_from_agents_for_amazon_bedrock():
+    """
+    Normaly :: Invoke from Amazon Bedrock Agent
+
+    Condition:
+        Invoke from Amazon Bedrock Agent
+    Expects:
+        Return response for Amazon Bedrock Agent
+    """
     app, spec = setup_test(APIRuntime.BedrockAgent)
 
     @app.route(
@@ -112,7 +134,43 @@ def test_invoke_from_agents_for_amazon_bedrock():
     assert "koikoi" in response["response"]["responseBody"]["application/json"]["body"]
 
 
+def test_invoke_from_agents_for_amazon_bedrock_no_post_body():
+    """
+    Normaly :: Invoke from Amazon Bedrock Agent No Post Body
+
+    Condition:
+        Invoke from Amazon Bedrock Agent with empty body
+    Expects:
+        Return response for Amazon Bedrock Agent
+    """
+    app, spec = setup_test(APIRuntime.BedrockAgent)
+
+    @app.route(
+        "/posts",
+        methods=["POST"],
+        content_types=["application/json"],
+        docs=Docs(request=EmptySchema, response=EmptySchema),
+    )
+    def get_post():
+        return EmptySchema().json()
+
+    empty_request = parameter_agents_for_amazon_bedrock(
+        APIParameter(httpMethod="POST", apiPath="/posts")
+    )
+    empty_request["requestBody"]["content"] = {}
+    response = app(empty_request, {})
+    assert response["response"]["httpStatusCode"] == 200
+
+
 def test_invoke_from_agents_for_api_gateway():
+    """
+    Normaly :: Invoke from Amazon API Gateway
+
+    Condition:
+        Invoke from Amazon API Gateway
+    Expects:
+        Return response for Amazon API Gateway
+    """
     app, spec = setup_test(APIRuntime.APIGateway)
 
     @app.route(
@@ -132,3 +190,96 @@ def test_invoke_from_agents_for_api_gateway():
     assert "nintendo" in response["body"]
     assert "atari" in response["body"]
     assert "koikoi" in response["body"]
+
+
+def test_invoke_from_dual_services():
+    """
+    Normaly :: Invoke from Amazon Bedrock Agent and Amazon API Gateway
+
+    Condition:
+        Allowed to Invoke from Amazon Bedrock Agent and Amazon API Gateway
+    Expects:
+        Return response for Correct response
+    """
+    app, spec = setup_test([APIRuntime.APIGateway, APIRuntime.BedrockAgent])
+
+    @app.route(
+        "/posts",
+        methods=["POST"],
+        content_types=["application/json"],
+        docs=Docs(request=TestSchema, response=AnotherSchema),
+    )
+    def get_post():
+        return AnotherSchema(nintendo="koikoi", atari="game").json()
+
+    response = app(
+        parameter_api_gateway(APIParameter(httpMethod="POST", apiPath="/posts")),
+        {},
+    )
+    assert response["statusCode"] == 200
+
+    response = app(
+        parameter_agents_for_amazon_bedrock(
+            APIParameter(httpMethod="POST", apiPath="/posts")
+        ),
+        {},
+    )
+    assert response["response"]["httpStatusCode"] == 200
+
+
+def test_invoke_from_deny_service():
+    """
+    Anomaly :: Invoke from Deny Service
+
+    Condition:
+        Allow to Invoke Api Gateway
+        But invoke from Amazon Bedrock Agent
+    Expects:
+        Failed to execute
+    """
+    app, spec = setup_test([APIRuntime.APIGateway])
+
+    @app.route(
+        "/posts",
+        methods=["POST"],
+        content_types=["application/json"],
+        docs=Docs(request=TestSchema, response=AnotherSchema),
+    )
+    def get_post():
+        return AnotherSchema(nintendo="koikoi", atari="game").json()
+
+    try:
+        app(
+            parameter_agents_for_amazon_bedrock(
+                APIParameter(httpMethod="POST", apiPath="/posts")
+            ),
+            {},
+        )
+        assert True
+    except Exception:
+        pass
+
+
+def test_converter_base_class():
+    """
+    Normaliy :: Call base class method
+
+    Expects:
+        Base class is not changed received parameter
+    """
+    assert EventConverter().convert_request({"Hello": "world"})["Hello"] == "world"
+    assert EventConverter().convert_response({}, {"Hello": "world"})["Hello"] == "world"
+
+
+def test_utility_functions_create_empty_base_models():
+    """
+    Normally :: Create empty base models
+
+    Expects:
+        No Assertion Errors
+    """
+    assert is_api_gateway_event(empty_api_gateway_event().dict(by_alias=True))
+    assert is_bedrock_agent_event(empty_bedrock_agent_event().dict(by_alias=True))
+    assert not is_api_gateway_event(empty_bedrock_agent_event().dict(by_alias=True))
+    assert not is_bedrock_agent_event(empty_api_gateway_event().dict(by_alias=True))
+    empty_bedrock_agent_response()

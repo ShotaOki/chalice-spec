@@ -35,6 +35,21 @@ class BedrockAgentEventToApiGateway(EventConverter):
         """
         return property.value
 
+    def _is_contains_properties(self, agent_event: BedrockAgentEventModel):
+        """
+        check Bedrock Agent Event Model is contains properties.
+
+        :param agent_event: Bedrock Agent Event Model
+        :return: bool
+        """
+        return all(
+            [
+                (agent_event.request_body is not None),
+                (agent_event.request_body.content is not None),
+                (self._content_type in agent_event.request_body.content),
+            ]
+        )
+
     def convert_request(self, event: dict) -> dict:
         """
         parse event input to other type parameter.
@@ -50,7 +65,7 @@ class BedrockAgentEventToApiGateway(EventConverter):
         apigw_event.requestContext.resourcePath = agent_event.api_path
         apigw_event.headers[HEADER_KEY_CONTENT_TYPE] = self._content_type
         # Set event body for chalice
-        if agent_event.parameters is not None:
+        if self._is_contains_properties(agent_event):
             apigw_event.body = json.dumps(
                 {
                     prop.name: self._parse_value(prop)
@@ -59,8 +74,6 @@ class BedrockAgentEventToApiGateway(EventConverter):
                     ].properties
                 }
             )
-        else:
-            apigw_event.body = json.dumps({})
         # Return api gateway event
         return apigw_event.dict(by_alias=True)
 
