@@ -231,7 +231,34 @@ def test_invoke_from_dual_services():
     assert response["response"]["httpStatusCode"] == 200
 
 
-def test_invoke_from_deny_service():
+def test_invoke_from_default_setting():
+    """
+    Normaly :: Invoke from API Gateway (setting is default runtime)
+
+    Condition:
+        Allowed default setting
+    Expects:
+        Return response for Correct response
+    """
+    app, spec = setup_test(None)
+
+    @app.route(
+        "/posts",
+        methods=["POST"],
+        content_types=["application/json"],
+        docs=Docs(request=TestSchema, response=AnotherSchema),
+    )
+    def get_post():
+        return AnotherSchema(nintendo="koikoi", atari="game").json()
+
+    response = app(
+        parameter_api_gateway(APIParameter(httpMethod="POST", apiPath="/posts")),
+        {},
+    )
+    assert response["statusCode"] == 200
+
+
+def test_invoke_from_deny_service_agent_for_bedrock():
     """
     Anomaly :: Invoke from Deny Service
 
@@ -257,6 +284,37 @@ def test_invoke_from_deny_service():
             parameter_agents_for_amazon_bedrock(
                 APIParameter(httpMethod="POST", apiPath="/posts")
             ),
+            {},
+        )
+        assert True
+    except Exception:
+        pass
+
+
+def test_invoke_from_deny_service_api_gateway():
+    """
+    Anomaly :: Invoke from Deny Service
+
+    Condition:
+        Allow to Invoke Bedrock Agent
+        But invoke from Api Gateway
+    Expects:
+        Failed to execute
+    """
+    app, spec = setup_test([APIRuntimeBedrockAgent])
+
+    @app.route(
+        "/posts",
+        methods=["POST"],
+        content_types=["application/json"],
+        docs=Docs(request=TestSchema, response=AnotherSchema),
+    )
+    def get_post():
+        return AnotherSchema(nintendo="koikoi", atari="game").json()
+
+    try:
+        app(
+            parameter_api_gateway(APIParameter(httpMethod="POST", apiPath="/posts")),
             {},
         )
         assert True

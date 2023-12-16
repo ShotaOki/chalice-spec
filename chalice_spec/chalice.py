@@ -1,7 +1,7 @@
 import re
 
 from chalice_spec.docs import trim_docstring
-from chalice_spec.runtime import APIRuntimeHandler, APIRuntimeApiGateway, APIRuntime
+from chalice_spec.runtime import APIRuntimeHandler, APIRuntime
 from chalice_spec import Docs, Operation
 from typing import Any, Callable, Optional, Union, List
 
@@ -92,7 +92,7 @@ class ChaliceWithSpec(Chalice, APIRuntimeHandler):
         app_name: str,
         spec: APISpec,
         generate_default_docs=False,
-        runtime: list[APIRuntime] = APIRuntimeApiGateway,
+        runtime: Optional[List[APIRuntime]] = None,
         **kwargs
     ):
         super().__init__(app_name, **kwargs)
