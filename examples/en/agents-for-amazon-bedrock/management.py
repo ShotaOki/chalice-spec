@@ -1,3 +1,4 @@
+import time
 import boto3
 import sys
 from pydantic import BaseModel, Field
@@ -129,6 +130,8 @@ class CurrentAgentInfo(BaseModel):
     agent_id: str
     # Action Group Id
     action_group_id: str
+    # Agent Status
+    agent_status: str
 
 
 def read_current_agent_info(
@@ -139,7 +142,10 @@ def read_current_agent_info(
     """
     # Get Agent Id
     agent_ids = [
-        item["agentId"]  # Search Agent Id from Agent Name
+        {
+            "id": item["agentId"],  # Search Agent Id from Agent Name
+            "status": item["agentStatus"],  # Search Agent Status from Agent Name
+        }
         for item in bedrock_agent.list_agents()["agentSummaries"]
         if item["agentName"] == identity.ChaliceConfig.app_name
     ]
@@ -152,16 +158,22 @@ def read_current_agent_info(
     action_group_ids = [
         item["actionGroupId"]  # Search Action Group Id from Action Group Name
         for item in bedrock_agent.list_agent_action_groups(
-            agentId=agent_ids[0], agentVersion=identity.AgentConfig.agent_version
+            agentId=agent_ids[0]["id"], agentVersion=identity.AgentConfig.agent_version
         )["actionGroupSummaries"]
         if item["actionGroupName"] == identity.AgentConfig.agent_action_name
     ]
     if len(action_group_ids) == 0:
-        # No Action Group id: Abort process
-        print("not found action group")
-        return None
+        return CurrentAgentInfo(
+            agent_id=agent_ids[0]["id"],
+            agent_status=agent_ids[0]["status"],
+            action_group_id="",
+        )
 
-    return CurrentAgentInfo(agent_id=agent_ids[0], action_group_id=action_group_ids[0])
+    return CurrentAgentInfo(
+        agent_id=agent_ids[0]["id"],
+        agent_status=agent_ids[0]["status"],
+        action_group_id=action_group_ids[0],
+    )
 
 
 def create_resource(identity: CallerIdentity, cfn):
@@ -236,6 +248,18 @@ def init():
     agent_id = response["agent"]["agentId"]
     print(f"- Created agents for amazon bedrock : {agent_id}")
 
+    # Wait for creating agent
+    while True:
+        current_agent = read_current_agent_info(identity, bedrock_agent)
+        if current_agent is None:
+            print("Failed to create agent")
+            return
+        if current_agent.agent_status == "CREATING":
+            time.sleep(5)
+        else:
+            # Success to create agent
+            break
+
     # Create Agent Action Group
     bedrock_agent.create_agent_action_group(
         agentId=agent_id,
@@ -291,7 +315,7 @@ def sync():
 
     # Get Current Agent Setting
     agent_info = read_current_agent_info(identity, bedrock_agent)
-    if agent_info is None:
+    if (agent_info is None) or len(agent_info.action_group_id) == 0:
         print("not found agent")
         return
 
@@ -354,7 +378,8 @@ def delete():
 
     # Get Current Agent Setting
     agent_info = read_current_agent_info(identity, bedrock_agent)
-    if agent_info is None:
+    if (agent_info is None) or len(agent_info.action_group_id) == 0:
+        print("not found agent")
         return
 
     # Delete Agent Action Group
