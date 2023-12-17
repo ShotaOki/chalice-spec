@@ -42,13 +42,13 @@ class BedrockAgentEventToApiGateway(EventConverter):
         :param agent_event: Bedrock Agent Event Model
         :return: bool
         """
-        return all(
-            [
-                (agent_event.request_body is not None),
-                (agent_event.request_body.content is not None),
-                (self._content_type in agent_event.request_body.content),
-            ]
-        )
+        if (
+            (agent_event.request_body is not None)
+            and (agent_event.request_body.content is not None)
+            and (self._content_type in agent_event.request_body.content)
+        ):
+            return True
+        return False
 
     def convert_request(self, event: dict) -> dict:
         """
