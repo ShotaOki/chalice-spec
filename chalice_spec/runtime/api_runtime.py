@@ -18,9 +18,15 @@ class APIRuntime(Enum):
     BedrockAgent = "bedrock-agent"
 
 
-# Runtime Constants
+"""
+Runtime Constants
+"""
+
+# Allow to call from API Gateway or run local
 APIRuntimeApiGateway = [APIRuntime.APIGateway]
+# Allow to call from Bedrock Agent
 APIRuntimeBedrockAgent = [APIRuntime.BedrockAgent]
+# Allow to call from API Gateway or Bedrock Agent or run local
 APIRuntimeAll = [APIRuntime.APIGateway, APIRuntime.BedrockAgent]
 
 
