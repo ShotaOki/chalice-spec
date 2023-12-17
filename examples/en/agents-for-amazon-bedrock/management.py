@@ -9,14 +9,43 @@ import json
 import io
 
 
-SCHEMA_FILE = "api-schema.json"
-INSTRUCTIONS = "You are an merchant in video game who selling and buying items."
-AGENT_VERSION = "DRAFT"
-AGENT_ACTION_NAME = "Main"
+class AgentsForAmazonBedrockConfig(BaseModel):
+    """
+    Amazon Bedrock Agent Config
+    """
+
+    # OpenAPI Schema File Name in S3 Bucket
+    schema_file: str = Field("api-schema.json")
+    # Bedrock Agent Instructions (Situsation settings for LLM)
+    instructions: str = Field("You are AI agent.")
+    # Bedrock Agent Version (Const: DRAFT)
+    agent_version: str = Field("DRAFT")
+    # Bedrock Agent Action Group Name
+    agent_action_name: str = Field("Main")
+    # Agent Service description
+    description: str = Field("")
+    # Session time
+    idle_session_ttl_in_seconds: int = Field(900)
+    # LLM Model ID
+    foundation_model: str = Field("anthropic.claude-v2")
+
+
+def read_agents_for_amazon_bedrock_config():
+    """
+    Read Config File
+    """
+    with open(str(Path(".chalice") / "agents-for-amazon-bedrock.json")) as fp:
+        return AgentsForAmazonBedrockConfig.parse_raw(fp.read())
 
 
 class ChaliceConfigFile(BaseModel):
+    """
+    Chalice Config File
+    """
+
+    # Chalice App Version
     version: str = Field("")
+    # Chalice App Name
     app_name: str = Field("")
 
 
@@ -34,6 +63,7 @@ class CallerIdentity(BaseModel):
     Arn: str
     Region: str = Field("us-east-1")
     ChaliceConfig: ChaliceConfigFile = Field(ChaliceConfigFile())
+    AgentConfig: AgentsForAmazonBedrockConfig = Field(AgentsForAmazonBedrockConfig())
     Stage: str = Field("dev")
 
     @property
@@ -72,8 +102,9 @@ def read_identity():
     """
     Read Account Identity from STS
     """
-    # Current Region
+    # Current Region (Read from current Environment variable)
     region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    # Create Session on Current Region
     session = boto3.Session(region_name=region)
     # Get Account Into
     identity = session.client("sts").get_caller_identity()
@@ -81,51 +112,68 @@ def read_identity():
     item = CallerIdentity.parse_obj(identity)
     # Set Current Region
     item.Region = region
-    #
+    # Read config from .chalice/config.json
     item.ChaliceConfig = read_config()
+    # Read config from .chalice/agents-for-amazon-bedrock.json
+    item.AgentConfig = read_agents_for_amazon_bedrock_config()
+    # Return Identity
     return item
 
 
 class CurrentAgentInfo(BaseModel):
+    """
+    Agents for Amazon Bedrock Response Value
+    """
+
+    # Agent Id
     agent_id: str
+    # Action Group Id
     action_group_id: str
 
 
 def read_current_agent_info(
     identity: CallerIdentity, bedrock_agent
 ) -> CurrentAgentInfo:
+    """
+    Read Current Agent Info From AWS Cloud
+    """
+    # Get Agent Id
     agent_ids = [
-        item["agentId"]
+        item["agentId"]  # Search Agent Id from Agent Name
         for item in bedrock_agent.list_agents()["agentSummaries"]
         if item["agentName"] == identity.ChaliceConfig.app_name
     ]
     if len(agent_ids) == 0:
+        # No Agent id: Abort process
         print("not found agent")
         return None
 
-    # Get Agent Id
-    agent_id = agent_ids[0]
+    # Get Action Group Id
     action_group_ids = [
-        item["actionGroupId"]
+        item["actionGroupId"]  # Search Action Group Id from Action Group Name
         for item in bedrock_agent.list_agent_action_groups(
-            agentId=agent_id, agentVersion=AGENT_VERSION
+            agentId=agent_ids[0], agentVersion=identity.AgentConfig.agent_version
         )["actionGroupSummaries"]
-        if item["actionGroupName"] == AGENT_ACTION_NAME
+        if item["actionGroupName"] == identity.AgentConfig.agent_action_name
     ]
     if len(action_group_ids) == 0:
+        # No Action Group id: Abort process
         print("not found action group")
         return None
 
-    return CurrentAgentInfo(agent_id=agent_id, action_group_id=action_group_ids[0])
+    return CurrentAgentInfo(agent_id=agent_ids[0], action_group_id=action_group_ids[0])
 
 
 def create_resource(identity: CallerIdentity, cfn):
     """
-    Create Resource for Agent
+    Create Resource for Agent with CloudFormation
     """
+    # Read Cloudformation template
     with open("template.yaml") as fp:
         template_body = fp.read()
 
+    # Create Stack parameter
+    # Required "Capability Named IAM"
     parameter = {
         "StackName": identity.stack_name,
         "TemplateBody": template_body,
@@ -136,55 +184,76 @@ def create_resource(identity: CallerIdentity, cfn):
     }
 
     try:
+        # Create Resources
         cfn.create_stack(**parameter)
     except Exception:
+        # Update Resources
         cfn.update_stack(**parameter)
 
 
 def init():
+    """
+    Command : init
+
+    Create Initial Resource
+    """
+    # Read config
     identity = read_identity()
+
+    # Create CloudFormation Client
     cfn = identity.session.client("cloudformation")
 
-    print("start create stack...")
-    create_resource(identity, cfn)
+    print("Start : Init")
 
+    # Create Cloudfomation Stack
+    create_resource(identity, cfn)
+    print(f"- Created stack : {identity.stack_name}")
+
+    # Wait for complete
     waiter = cfn.get_waiter("stack_create_complete")
     waiter.wait(StackName=identity.stack_name)
-    print("stack created")
 
-    print("upload schema file")
+    # Upload OpenAPI Schema File
     bucket = identity.session.resource("s3").Bucket(identity.bucket_name)
     with io.BytesIO(json.dumps(spec.to_dict()).encode("utf-8")) as fp:
-        bucket.upload_fileobj(fp, SCHEMA_FILE)
-    print("uploaded schema file")
+        bucket.upload_fileobj(fp, identity.AgentConfig.schema_file)
+    print(
+        f"- Uploaded OpenAPI schema file to {identity.bucket_name}/{identity.AgentConfig.schema_file}"
+    )
 
-    print("create agents for amazon bedrock...")
+    # Create Agent for Amazon Bedrock
     bedrock_agent = identity.session.client("bedrock-agent")
     response = bedrock_agent.create_agent(
         agentName=identity.ChaliceConfig.app_name,
         agentResourceRoleArn=identity.agents_role_arn,
-        instruction=INSTRUCTIONS,
-        description="Agents for Amazon Bedrock Sample Project",
-        idleSessionTTLInSeconds=900,
-        foundationModel="anthropic.claude-v2",
+        instruction=identity.AgentConfig.instructions,
+        description=identity.AgentConfig.description,
+        idleSessionTTLInSeconds=identity.AgentConfig.idle_session_ttl_in_seconds,
+        foundationModel=identity.AgentConfig.foundation_model,
     )
-    agent_id = response["agent"]["agentId"]
-    print(f"created agents {agent_id}")
 
-    print("create agent action group...")
+    # Get Created Agent Id
+    agent_id = response["agent"]["agentId"]
+    print(f"- Created agents for amazon bedrock : {agent_id}")
+
+    # Create Agent Action Group
     bedrock_agent.create_agent_action_group(
         agentId=agent_id,
-        agentVersion=AGENT_VERSION,
-        actionGroupName=AGENT_ACTION_NAME,
-        description="Agents for Amazon Bedrock Sample Project",
+        agentVersion=identity.AgentConfig.agent_version,
+        actionGroupName=identity.AgentConfig.agent_action_name,
+        description=identity.AgentConfig.description,
         actionGroupExecutor={"lambda": identity.lambda_arn},
         apiSchema={
-            "s3": {"s3BucketName": identity.bucket_name, "s3ObjectKey": SCHEMA_FILE}
+            "s3": {
+                "s3BucketName": identity.bucket_name,
+                "s3ObjectKey": identity.AgentConfig.schema_file,
+            }
         },
         actionGroupState="ENABLED",
     )
+    print("- Created agent action group")
 
-    print("add permission to lambda function...")
+    # Add Permission to Lambda Function for Execute from Agent
     identity.session.client("lambda").add_permission(
         Action="lambda:InvokeFunction",
         FunctionName=identity.lambda_function_name,
@@ -192,31 +261,48 @@ def init():
         SourceArn=identity.agent_id_to_arn(agent_id),
         StatementId="amazon-bedrock-agent",
     )
+    print(f"- Added permission to lambda function : {identity.lambda_function_name}")
 
+    # Finished Message
     print("completed")
 
 
 def sync():
+    """
+    Command : sync
+
+    Sync local LLM Message to cloud.
+    """
+    # Read config
     identity = read_identity()
+
+    # Create Agent for Amazon Bedrock Client
     bedrock_agent = identity.session.client("bedrock-agent")
 
-    print("upload schema file")
+    print("Start : Sync")
+
+    # Upload OpenAPI Schema File
     bucket = identity.session.resource("s3").Bucket(identity.bucket_name)
     with io.BytesIO(json.dumps(spec.to_dict()).encode("utf-8")) as fp:
-        bucket.upload_fileobj(fp, SCHEMA_FILE)
-    print("uploaded schema file")
+        bucket.upload_fileobj(fp, identity.AgentConfig.schema_file)
+    print(
+        f"- Uploaded OpenAPI schema file to {identity.bucket_name}/{identity.AgentConfig.schema_file}"
+    )
 
+    # Get Current Agent Setting
     agent_info = read_current_agent_info(identity, bedrock_agent)
     if agent_info is None:
+        print("not found agent")
         return
 
     response = bedrock_agent.get_agent_action_group(
         agentId=agent_info.agent_id,
-        agentVersion=AGENT_VERSION,
+        agentVersion=identity.AgentConfig.agent_version,
         actionGroupId=agent_info.action_group_id,
     )
+    print(f"- Get current agent : {agent_info.agent_id} : {agent_info.action_group_id}")
 
-    print("update agent action group...")
+    # Rewrite Agent, sync current setting.
     bedrock_agent.update_agent_action_group(
         agentId=agent_info.agent_id,
         agentVersion=response["agentActionGroup"]["agentVersion"],
@@ -238,38 +324,73 @@ def sync():
             }
         },
     )
+    print(f"- Updated agents for amazon bedrock : {agent_info.agent_id}")
+
+    # Finished Message
+    print("completed")
 
 
 def delete():
+    """
+    Command : delete
+
+    Delete Agent for Amazon Bedrock Resources
+    """
+
+    # Read config
     identity = read_identity()
+
+    # Create Agent for Amazon Bedrock Client and S3 Client
     bedrock_agent = identity.session.client("bedrock-agent")
     s3 = identity.session.client("s3")
 
-    print("delete schema file...")
-    s3.delete_object(Bucket=identity.bucket_name, Key=SCHEMA_FILE)
+    print("Start : Delete")
 
+    # Delete OpenAPI Schema File
+    s3.delete_object(Bucket=identity.bucket_name, Key=identity.AgentConfig.schema_file)
+    print(
+        f"- Deleted OpenAPI schema file to {identity.bucket_name}/{identity.AgentConfig.schema_file}"
+    )
+
+    # Get Current Agent Setting
     agent_info = read_current_agent_info(identity, bedrock_agent)
     if agent_info is None:
         return
 
-    print("delete agent action group...")
+    # Delete Agent Action Group
     bedrock_agent.delete_agent_action_group(
         agentId=agent_info.agent_id,
-        agentVersion=AGENT_VERSION,
+        agentVersion=identity.AgentConfig.agent_version,
         actionGroupId=agent_info.action_group_id,
         skipResourceInUseCheck=True,
     )
+    print("- Deleted agent action group")
 
-    print("delete agent...")
+    # Delete Agent
     bedrock_agent.delete_agent(agentId=agent_info.agent_id, skipResourceInUseCheck=True)
+    print(f"- Deleted agents for amazon bedrock : {agent_info.agent_id}")
 
+    # Delete CloudFormation Stack
     cfn = identity.session.client("cloudformation")
     cfn.delete_stack(StackName=identity.stack_name)
+    print(f"- Start to delete stack... : {identity.stack_name}")
 
-    print("start delete stack...")
+    # Wait for complete
     waiter = cfn.get_waiter("stack_delete_complete")
     waiter.wait(StackName=identity.stack_name)
+    print(f"- Deleted stack : {identity.stack_name}")
+
+    # Finished Message
     print("completed")
+
+
+def show():
+    """
+    Command : show
+
+    Show OpenAPI Schema
+    """
+    print(json.dumps(spec.to_dict(), indent=2))
 
 
 if __name__ == "__main__":
@@ -279,3 +400,5 @@ if __name__ == "__main__":
         sync()
     if sys.argv[1] == "delete":
         delete()
+    if sys.argv[1] == "show":
+        show()
